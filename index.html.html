@@ -1,0 +1,1900 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Local Image Compare</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #111827;
+    --muted: #6b7280;
+    --border: #d9dde5;
+    --border-strong: #b8bec9;
+    --button: #ffffff;
+    --button-hover: #f0f2f5;
+    --shadow: 0 10px 30px rgba(0,0,0,.12);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { width:100%; height:100%; margin:0; }
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  button, select, input { font: inherit; }
+  .hidden { display: none !important; }
+
+  /* Upload screen */
+  #uploadScreen {
+    height: 100%;
+    overflow: auto;
+    padding: 28px;
+  }
+
+  .shell {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+  }
+
+  .topbar {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:22px;
+  }
+
+  .brand {
+    font-size:21px;
+    font-weight:750;
+    letter-spacing:-.02em;
+  }
+
+  .badge {
+    border:1px solid var(--border);
+    background:#fff;
+    border-radius:999px;
+    padding:7px 12px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .notice {
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:13px 15px;
+    color:#4b5563;
+    font-size:14px;
+    margin-bottom:16px;
+  }
+
+  .bulk-drop {
+    border:2px dashed var(--border-strong);
+    border-radius:14px;
+    background:#fff;
+    min-height:140px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    cursor:pointer;
+    margin-bottom:16px;
+    transition: background .15s ease, border-color .15s ease;
+  }
+
+  .bulk-drop:hover,
+  .bulk-drop.dragover {
+    background:#fafafa;
+    border-color:#111827;
+  }
+
+  .bulk-drop-title {
+    font-size:19px;
+    font-weight:750;
+  }
+
+  .bulk-drop-subtitle {
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .upload-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:14px;
+  }
+
+  .upload-card {
+    min-height:220px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    border-radius:14px;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .upload-card.dragover {
+    outline:2px solid #111827;
+    outline-offset:-2px;
+  }
+
+  .card-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .card-title {
+    font-size:14px;
+    color:var(--muted);
+    font-weight:650;
+  }
+
+  .remove-btn {
+    border:0;
+    background:transparent;
+    color:var(--muted);
+    cursor:pointer;
+    font-size:18px;
+    padding:2px 6px;
+  }
+
+  .dropzone {
+    flex:1;
+    border:1.5px dashed var(--border-strong);
+    border-radius:12px;
+    min-height:138px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    gap:9px;
+    padding:14px;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .dropzone:hover { background:#fafafa; }
+  .dropzone h3 {
+    margin:0;
+    font-size:17px;
+    font-weight:700;
+  }
+  .dropzone p {
+    margin:0;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .thumb {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    background:#111;
+  }
+
+  .thumb-label {
+    position:absolute;
+    left:10px;
+    bottom:10px;
+    max-width:calc(100% - 20px);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:#fff;
+    background:rgba(0,0,0,.65);
+    backdrop-filter: blur(4px);
+    border-radius:6px;
+    padding:5px 8px;
+    font-size:12px;
+  }
+
+  .upload-actions {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-top:16px;
+    flex-wrap:wrap;
+  }
+
+  .button {
+    border:1px solid var(--border-strong);
+    background:var(--button);
+    color:var(--text);
+    border-radius:9px;
+    padding:10px 14px;
+    cursor:pointer;
+    font-weight:650;
+  }
+
+  .button:hover { background:var(--button-hover); }
+  .button.primary {
+    background:#111827;
+    color:white;
+    border-color:#111827;
+  }
+  .button.primary:hover { background:#272f3d; }
+  .button:disabled {
+    opacity:.45;
+    cursor:not-allowed;
+  }
+
+  .upload-count { color:var(--muted); font-size:13px; }
+
+  /* Compare screen */
+  #compareScreen {
+    height:100%;
+    display:grid;
+    grid-template-rows:auto 1fr;
+    background:#0b0d10;
+  }
+
+  .compare-toolbar {
+    min-height:62px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 14px;
+    background:#fff;
+    border-bottom:1px solid var(--border);
+    z-index:20;
+    flex-wrap:wrap;
+  }
+
+  .toolbar-group {
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .toolbar-sep {
+    width:1px;
+    height:30px;
+    background:var(--border);
+    margin:0 2px;
+  }
+
+  .toolbar-spacer { flex:1; }
+
+  .toolbtn {
+    height:38px;
+    min-width:38px;
+    border:1px solid var(--border);
+    background:#fff;
+    border-radius:9px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 11px;
+    font-weight:650;
+  }
+
+  .toolbtn:hover { background:#f4f5f7; }
+  .toolbtn.active { background:#e9edf3; }
+  .toolbtn:disabled { opacity:.45; cursor:not-allowed; }
+
+  .image-select {
+    height:38px;
+    min-width:170px;
+    max-width:260px;
+    border:1px solid var(--border);
+    background:#fff;
+    border-radius:9px;
+    padding:0 10px;
+  }
+
+  .select-label {
+    color:var(--muted);
+    font-size:12px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+  }
+
+  .zoom-readout {
+    min-width:58px;
+    text-align:center;
+    font-variant-numeric:tabular-nums;
+    color:#374151;
+    font-size:14px;
+    font-weight:650;
+  }
+
+  .blink-rate {
+    width:72px;
+    height:38px;
+    border:1px solid var(--border);
+    background:#fff;
+    border-radius:9px;
+    padding:0 10px;
+  }
+
+  .viewer {
+    position:relative;
+    overflow:hidden;
+    min-height:0;
+    background:
+      linear-gradient(45deg,#171a1f 25%,transparent 25%) 0 0/28px 28px,
+      linear-gradient(45deg,transparent 75%,#171a1f 75%) 0 0/28px 28px,
+      linear-gradient(45deg,transparent 75%,#171a1f 75%) 14px -14px/28px 28px,
+      linear-gradient(45deg,#171a1f 25%,#111419 25%) 14px 14px/28px 28px;
+    cursor:grab;
+    user-select:none;
+    touch-action:none;
+  }
+
+  .viewer.dragging { cursor:grabbing; }
+
+  .layer {
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+    pointer-events:none;
+  }
+
+  #layerB { clip-path: inset(0 50% 0 0); }
+
+  .compare-img {
+    position:absolute;
+    left:0;
+    top:0;
+    max-width:none;
+    max-height:none;
+    transform-origin:0 0;
+    user-select:none;
+    -webkit-user-drag:none;
+    pointer-events:none;
+  }
+
+  .split-line {
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:50%;
+    width:2px;
+    background:rgba(255,255,255,.95);
+    box-shadow:0 0 0 1px rgba(0,0,0,.25), 0 0 10px rgba(0,0,0,.35);
+    transform:translateX(-1px);
+    z-index:8;
+    cursor:ew-resize;
+  }
+
+  .split-handle {
+    position:absolute;
+    top:50%;
+    left:50%;
+    width:54px;
+    height:54px;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    border:1px solid rgba(0,0,0,.2);
+    background:#fff;
+    box-shadow:var(--shadow);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    color:#111827;
+    font-size:19px;
+    font-weight:800;
+  }
+
+  .split-hitbox {
+    position:absolute;
+    top:0;
+    bottom:0;
+    width:32px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:10;
+    cursor:ew-resize;
+  }
+
+  .corner-label {
+    position:absolute;
+    top:14px;
+    z-index:7;
+    background:rgba(255,255,255,.92);
+    color:#111827;
+    border:1px solid rgba(0,0,0,.12);
+    backdrop-filter:blur(6px);
+    border-radius:8px;
+    padding:7px 10px;
+    font-size:12px;
+    font-weight:750;
+    max-width:40%;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+    pointer-events:none;
+  }
+
+  #labelA { right:14px; }
+  #labelB { left:14px; }
+
+  .help {
+    position:absolute;
+    bottom:14px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:7;
+    color:#e5e7eb;
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.14);
+    backdrop-filter:blur(6px);
+    padding:7px 10px;
+    border-radius:8px;
+    font-size:12px;
+    pointer-events:none;
+  }
+
+  .side-viewer {
+    position:absolute;
+    inset:0;
+    display:flex;
+    overflow:hidden;
+    background:#0b0d10;
+  }
+
+  .side-col {
+    flex:1 1 0;
+    min-width:0;
+    position:relative;
+    overflow:hidden;
+    border-right:1px solid rgba(255,255,255,.18);
+    background:#111419;
+  }
+
+  .side-col:last-child { border-right:0; }
+
+  .side-col img {
+    position:absolute;
+    top:0;
+    left:0;
+    max-width:none;
+    max-height:none;
+    transform-origin:0 0;
+    pointer-events:none;
+    user-select:none;
+    -webkit-user-drag:none;
+  }
+
+  .side-col-label {
+    position:absolute;
+    top:10px;
+    left:10px;
+    z-index:3;
+    max-width:calc(100% - 20px);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:#111827;
+    background:rgba(255,255,255,.92);
+    border:1px solid rgba(0,0,0,.12);
+    backdrop-filter:blur(6px);
+    border-radius:7px;
+    padding:6px 8px;
+    font-size:11px;
+    font-weight:750;
+    pointer-events:none;
+  }
+
+  .blink-viewer {
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+  }
+
+  .blink-badge {
+    position:absolute;
+    top:14px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:7;
+    background:rgba(255,255,255,.92);
+    color:#111827;
+    border:1px solid rgba(0,0,0,.12);
+    backdrop-filter:blur(6px);
+    border-radius:8px;
+    padding:7px 10px;
+    font-size:12px;
+    font-weight:750;
+    pointer-events:none;
+  }
+
+  @media (max-width: 940px) {
+    .compare-toolbar { gap:7px; }
+    .image-select { min-width:120px; max-width:160px; }
+    .toolbar-spacer { display:none; }
+  }
+
+  @media (max-width: 780px) {
+    .help { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<section id="uploadScreen">
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">Image Compare</div>
+      <div class="badge">Offline · files never leave your browser</div>
+    </div>
+
+    <div class="notice">
+      Add as many same-aspect-ratio images as you want. Then compare in slider mode, side-by-side mode, or blink mode.
+      Everything runs locally in your browser.
+    </div>
+
+    <div id="bulkDrop" class="bulk-drop">
+      <div class="bulk-drop-title">Drop all images here</div>
+      <div class="bulk-drop-subtitle">or click to choose multiple images at once</div>
+      <input id="bulkDropInput" type="file" accept="image/*" multiple hidden>
+    </div>
+
+    <div id="uploadGrid" class="upload-grid"></div>
+
+    <div class="upload-actions">
+      <div class="toolbar-group">
+        <button id="addSlotBtn" class="button" type="button">+ Add image slot</button>
+        <button id="clearAllBtn" class="button" type="button">Clear all</button>
+      </div>
+
+      <div class="toolbar-group">
+        <span id="uploadCount" class="upload-count">0 images loaded</span>
+        <button id="compareBtn" class="button primary" type="button" disabled>Compare images</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compareScreen" class="hidden">
+  <div class="compare-toolbar">
+    <button id="backBtn" class="toolbtn" type="button">← Back</button>
+
+    <div class="toolbar-sep"></div>
+
+    <div class="toolbar-group">
+      <span id="selectLabelA" class="select-label">Image 1</span>
+      <select id="selectA" class="image-select"></select>
+    </div>
+
+    <div class="toolbar-group">
+      <span id="selectLabelB" class="select-label">Image 2</span>
+      <select id="selectB" class="image-select"></select>
+    </div>
+
+    <button id="swapBtn" class="toolbtn" type="button" title="Swap selected images">⇄</button>
+
+    <div class="toolbar-sep"></div>
+
+    <div class="toolbar-group">
+      <button id="sliderModeBtn" class="toolbtn active" type="button">Slider</button>
+      <button id="sideModeBtn" class="toolbtn" type="button">Side by side</button>
+      <button id="blinkModeBtn" class="toolbtn" type="button">Blink</button>
+    </div>
+
+    <div id="blinkControls" class="toolbar-group hidden">
+      <span class="select-label">Rate</span>
+      <input id="blinkRateInput" class="blink-rate" type="number" min="0.2" step="0.1" value="2">
+      <span class="select-label">Hz</span>
+      <button id="pauseBlinkBtn" class="toolbtn" type="button">Pause</button>
+    </div>
+
+    <div class="toolbar-spacer"></div>
+
+    <div class="toolbar-group">
+      <button id="zoomOutBtn" class="toolbtn" type="button" title="Zoom out">−</button>
+      <div id="zoomReadout" class="zoom-readout">100%</div>
+      <button id="zoomInBtn" class="toolbtn" type="button" title="Zoom in">+</button>
+      <button id="resetBtn" class="toolbtn" type="button">Reset view</button>
+      <button id="fullscreenBtn" class="toolbtn" type="button" title="Fullscreen">⛶</button>
+      <select id="exportFormat" class="image-select" style="min-width:100px;max-width:110px">
+        <option value="gif">GIF</option>
+        <option value="apng">APNG</option>
+        <option value="webp">WebP</option>
+      </select>
+      <button id="exportAnimBtn" class="toolbtn" type="button" title="Export current blink view">Export</button>
+    </div>
+  </div>
+
+  <div id="viewer" class="viewer">
+    <div id="sideViewer" class="side-viewer hidden"></div>
+
+    <div id="layerA" class="layer"><img id="imageA" class="compare-img"></div>
+    <div id="layerB" class="layer"><img id="imageB" class="compare-img"></div>
+
+    <div id="blinkViewer" class="blink-viewer hidden">
+      <img id="blinkImageA" class="compare-img">
+      <img id="blinkImageB" class="compare-img">
+    </div>
+
+    <div id="splitLine" class="split-line">
+      <div class="split-handle"><span>‹</span><span>›</span></div>
+    </div>
+    <div id="splitHitbox" class="split-hitbox"></div>
+
+    <div id="labelB" class="corner-label"></div>
+    <div id="labelA" class="corner-label"></div>
+    <div id="blinkBadge" class="blink-badge hidden">Blink mode</div>
+
+    <div class="help">Drag to pan · Wheel to zoom · Slider compares 2 · Side by side shows all N · Blink alternates selected 2 and can export the current view as a GIF</div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const uploadScreen = document.getElementById('uploadScreen');
+  const compareScreen = document.getElementById('compareScreen');
+  const uploadGrid = document.getElementById('uploadGrid');
+  const bulkDrop = document.getElementById('bulkDrop');
+  const bulkDropInput = document.getElementById('bulkDropInput');
+  const addSlotBtn = document.getElementById('addSlotBtn');
+  const clearAllBtn = document.getElementById('clearAllBtn');
+  const compareBtn = document.getElementById('compareBtn');
+  const uploadCount = document.getElementById('uploadCount');
+
+  const viewer = document.getElementById('viewer');
+  const sideViewer = document.getElementById('sideViewer');
+  const imageA = document.getElementById('imageA');
+  const imageB = document.getElementById('imageB');
+  const blinkViewer = document.getElementById('blinkViewer');
+  const blinkImageA = document.getElementById('blinkImageA');
+  const blinkImageB = document.getElementById('blinkImageB');
+  const layerA = document.getElementById('layerA');
+  const layerB = document.getElementById('layerB');
+  const splitLine = document.getElementById('splitLine');
+  const splitHitbox = document.getElementById('splitHitbox');
+  const labelA = document.getElementById('labelA');
+  const labelB = document.getElementById('labelB');
+  const blinkBadge = document.getElementById('blinkBadge');
+
+  const selectA = document.getElementById('selectA');
+  const selectB = document.getElementById('selectB');
+  const selectLabelA = document.getElementById('selectLabelA');
+  const selectLabelB = document.getElementById('selectLabelB');
+  const backBtn = document.getElementById('backBtn');
+  const swapBtn = document.getElementById('swapBtn');
+  const sliderModeBtn = document.getElementById('sliderModeBtn');
+  const sideModeBtn = document.getElementById('sideModeBtn');
+  const blinkModeBtn = document.getElementById('blinkModeBtn');
+  const blinkControls = document.getElementById('blinkControls');
+  const blinkRateInput = document.getElementById('blinkRateInput');
+  const pauseBlinkBtn = document.getElementById('pauseBlinkBtn');
+  const zoomOutBtn = document.getElementById('zoomOutBtn');
+  const zoomInBtn = document.getElementById('zoomInBtn');
+  const zoomReadout = document.getElementById('zoomReadout');
+  const resetBtn = document.getElementById('resetBtn');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const exportFormat = document.getElementById('exportFormat');
+  const exportAnimBtn = document.getElementById('exportAnimBtn');
+
+  let slots = [];
+  let nextId = 1;
+
+  let mode = 'slider';
+  let split = 0.5;
+
+  let scale = 1;
+  let fitScale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  let draggingPan = false;
+  let draggingSplit = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  let blinkInterval = null;
+  let blinkShowingB = false;
+  let blinkPaused = false;
+
+  function loadedImages() {
+    return slots.filter(s => s.file && s.url);
+  }
+
+  function updateCount() {
+    const n = loadedImages().length;
+    uploadCount.textContent = `${n} image${n === 1 ? '' : 's'} loaded`;
+    compareBtn.disabled = n < 2;
+  }
+
+  function releaseSlot(slot) {
+    if (slot.url) URL.revokeObjectURL(slot.url);
+  }
+
+  function addEmptySlot() {
+    slots.push({ id: nextId++, file: null, url: null, name: '' });
+  }
+
+  function ensureMinimumSlots(n = 2) {
+    while (slots.length < n) addEmptySlot();
+  }
+
+  function addFiles(files) {
+    const imageFiles = [...files].filter(f => f.type && f.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    let empties = slots.filter(s => !s.file);
+    for (const file of imageFiles) {
+      let slot = empties.shift();
+      if (!slot) {
+        slot = { id: nextId++, file: null, url: null, name: '' };
+        slots.push(slot);
+      }
+      if (slot.url) URL.revokeObjectURL(slot.url);
+      slot.file = file;
+      slot.url = URL.createObjectURL(file);
+      slot.name = file.name;
+    }
+    renderSlots();
+    updateCount();
+  }
+
+  function loadFileIntoSlot(id, file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const slot = slots.find(s => s.id === id);
+    if (!slot) return;
+    if (slot.url) URL.revokeObjectURL(slot.url);
+    slot.file = file;
+    slot.url = URL.createObjectURL(file);
+    slot.name = file.name;
+    renderSlots();
+    updateCount();
+  }
+
+  function removeSlot(id) {
+    const idx = slots.findIndex(s => s.id === id);
+    if (idx === -1) return;
+    releaseSlot(slots[idx]);
+    slots.splice(idx, 1);
+    ensureMinimumSlots(2);
+    renderSlots();
+    updateCount();
+  }
+
+  function renderSlots() {
+    uploadGrid.innerHTML = '';
+
+    slots.forEach((slot, i) => {
+      const card = document.createElement('div');
+      card.className = 'upload-card';
+
+      const header = document.createElement('div');
+      header.className = 'card-header';
+
+      const title = document.createElement('div');
+      title.className = 'card-title';
+      title.textContent = `Image ${i + 1}`;
+
+      const remove = document.createElement('button');
+      remove.className = 'remove-btn';
+      remove.type = 'button';
+      remove.title = 'Remove image slot';
+      remove.textContent = '×';
+      remove.addEventListener('click', () => removeSlot(slot.id));
+
+      header.append(title, remove);
+
+      const zone = document.createElement('div');
+      zone.className = 'dropzone';
+
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.hidden = true;
+      input.addEventListener('change', () => {
+        if (input.files && input.files[0]) loadFileIntoSlot(slot.id, input.files[0]);
+      });
+
+      if (slot.url) {
+        const img = document.createElement('img');
+        img.className = 'thumb';
+        img.src = slot.url;
+
+        const label = document.createElement('div');
+        label.className = 'thumb-label';
+        label.textContent = slot.name;
+
+        zone.append(img, label);
+      } else {
+        const h = document.createElement('h3');
+        h.textContent = `Add image ${i + 1}`;
+        const p = document.createElement('p');
+        p.textContent = 'Drop or browse an image.';
+        const btn = document.createElement('button');
+        btn.className = 'button';
+        btn.type = 'button';
+        btn.textContent = 'Choose image';
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          input.click();
+        });
+        zone.append(h, p, btn);
+      }
+
+      zone.append(input);
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        card.classList.add('dragover');
+      });
+      zone.addEventListener('dragleave', () => card.classList.remove('dragover'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault();
+        card.classList.remove('dragover');
+        const file = [...e.dataTransfer.files].find(f => f.type && f.type.startsWith('image/'));
+        if (file) loadFileIntoSlot(slot.id, file);
+      });
+
+      card.append(header, zone);
+      uploadGrid.append(card);
+    });
+  }
+
+  function populateSelectors() {
+    const imgs = loadedImages();
+    selectA.innerHTML = '';
+    selectB.innerHTML = '';
+
+    imgs.forEach((img, i) => {
+      const label = img.name || `Image ${i + 1}`;
+      selectA.add(new Option(label, String(img.id)));
+      selectB.add(new Option(label, String(img.id)));
+    });
+
+    if (imgs.length) {
+      selectA.value = String(imgs[0].id);
+      selectB.value = String(imgs[Math.min(1, imgs.length - 1)].id);
+    }
+  }
+
+  function selectedSlot(select) {
+    return slots.find(s => String(s.id) === select.value);
+  }
+
+  function updateSelectedImages(resetView = false) {
+    const a = selectedSlot(selectA);
+    const b = selectedSlot(selectB);
+    if (!a || !b) return;
+
+    imageA.onload = () => { if (resetView) fitToScreen(); };
+    imageA.src = a.url;
+    imageB.src = b.url;
+    blinkImageA.src = a.url;
+    blinkImageB.src = b.url;
+
+    labelA.textContent = a.name;
+    labelB.textContent = b.name;
+    selectLabelA.textContent = a.name;
+    selectLabelB.textContent = b.name;
+
+    if (mode === 'side') buildSideView();
+    if (mode === 'blink') {
+      blinkShowingB = false;
+      applyBlinkVisibility();
+      restartBlink();
+    }
+
+    if (!resetView) applyTransform();
+  }
+
+  function applyTransform() {
+    const t = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+    imageA.style.transform = t;
+    imageB.style.transform = t;
+    blinkImageA.style.transform = t;
+    blinkImageB.style.transform = t;
+    sideViewer.querySelectorAll('img').forEach(img => {
+      img.style.transform = t;
+    });
+    const pct = fitScale ? (scale / fitScale) * 100 : 100;
+    zoomReadout.textContent = `${Math.round(pct)}%`;
+  }
+
+  function fitWidthForCurrentMode() {
+    if (mode === 'side') {
+      const n = Math.max(1, loadedImages().length);
+      return viewer.clientWidth / n;
+    }
+    return viewer.clientWidth;
+  }
+
+  function fitToScreen() {
+    const baseImg = selectedSlot(selectA) || loadedImages()[0];
+    if (!baseImg) return;
+
+    const probe = new Image();
+    probe.onload = () => {
+      const vw = fitWidthForCurrentMode();
+      const vh = viewer.clientHeight;
+      fitScale = Math.min(vw / probe.naturalWidth, vh / probe.naturalHeight);
+      scale = fitScale;
+      offsetX = (vw - probe.naturalWidth * scale) / 2;
+      offsetY = (vh - probe.naturalHeight * scale) / 2;
+      applyTransform();
+    };
+    probe.src = baseImg.url;
+  }
+
+  function zoomAt(factor, x = viewer.clientWidth / 2, y = viewer.clientHeight / 2) {
+    const wx = (x - offsetX) / scale;
+    const wy = (y - offsetY) / scale;
+
+    const min = fitScale * 0.1;
+    const max = fitScale * 50;
+    const newScale = Math.max(min, Math.min(max, scale * factor));
+
+    offsetX = x - wx * newScale;
+    offsetY = y - wy * newScale;
+    scale = newScale;
+    applyTransform();
+  }
+
+  function setSplitFromClientX(clientX) {
+    const r = viewer.getBoundingClientRect();
+    split = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    const pct = split * 100;
+    layerB.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+    splitLine.style.left = `${pct}%`;
+    splitHitbox.style.left = `${pct}%`;
+  }
+
+  function buildSideView() {
+    sideViewer.innerHTML = '';
+    for (const item of loadedImages()) {
+      const col = document.createElement('div');
+      col.className = 'side-col';
+
+      const img = document.createElement('img');
+      img.src = item.url;
+
+      const label = document.createElement('div');
+      label.className = 'side-col-label';
+      label.textContent = item.name;
+
+      col.append(img, label);
+      sideViewer.append(col);
+    }
+    applyTransform();
+  }
+
+  function applyBlinkVisibility() {
+    blinkImageA.style.display = blinkShowingB ? 'none' : 'block';
+    blinkImageB.style.display = blinkShowingB ? 'block' : 'none';
+    const hz = Math.max(0.2, Number(blinkRateInput.value) || 2);
+    const a = selectedSlot(selectA);
+    const b = selectedSlot(selectB);
+    const shownName = blinkShowingB ? (b ? b.name : 'Image 2') : (a ? a.name : 'Image 1');
+    blinkBadge.textContent = `Blink mode · ${hz} Hz · Showing ${shownName}`;
+  }
+
+  function stopBlink() {
+    if (blinkInterval) {
+      clearInterval(blinkInterval);
+      blinkInterval = null;
+    }
+  }
+
+  function restartBlink() {
+    stopBlink();
+    if (mode !== 'blink' || blinkPaused) return;
+    const hz = Math.max(0.2, Number(blinkRateInput.value) || 2);
+    const period = 1000 / hz;
+    blinkInterval = setInterval(() => {
+      blinkShowingB = !blinkShowingB;
+      applyBlinkVisibility();
+    }, period);
+    applyBlinkVisibility();
+  }
+
+  function setMode(nextMode) {
+    mode = nextMode;
+
+    const slider = mode === 'slider';
+    const side = mode === 'side';
+    const blink = mode === 'blink';
+
+    sliderModeBtn.classList.toggle('active', slider);
+    sideModeBtn.classList.toggle('active', side);
+    blinkModeBtn.classList.toggle('active', blink);
+
+    sideViewer.classList.toggle('hidden', !side);
+    layerA.classList.toggle('hidden', side || blink);
+    layerB.classList.toggle('hidden', side || blink);
+    splitLine.classList.toggle('hidden', !slider);
+    splitHitbox.classList.toggle('hidden', !slider);
+
+    blinkViewer.classList.toggle('hidden', !blink);
+    blinkControls.classList.toggle('hidden', !blink);
+    blinkBadge.classList.toggle('hidden', !blink);
+
+    labelA.classList.toggle('hidden', side);
+    labelB.classList.toggle('hidden', side);
+
+    selectA.disabled = side;
+    selectB.disabled = side;
+    swapBtn.disabled = side;
+
+    exportAnimBtn.disabled = !blink;
+    exportFormat.disabled = !blink;
+
+    if (side) {
+      buildSideView();
+      stopBlink();
+      fitToScreen();
+    } else if (blink) {
+      fitToScreen();
+      blinkShowingB = false;
+      applyBlinkVisibility();
+      restartBlink();
+    } else {
+      stopBlink();
+      fitToScreen();
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function drawOverlayTitle(ctx, width, text) {
+    if (!text) return;
+    ctx.save();
+    const fontSize = Math.max(14, Math.round(Math.min(width, 1200) * 0.018));
+    ctx.font = `700 ${fontSize}px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    ctx.textBaseline = 'middle';
+    const padX = Math.round(fontSize * 0.65);
+    const padY = Math.round(fontSize * 0.42);
+    const textW = Math.ceil(ctx.measureText(text).width);
+    const boxW = textW + padX * 2;
+    const boxH = fontSize + padY * 2;
+    const x = Math.round((width - boxW) / 2);
+    const y = 14;
+    if (ctx.roundRect) {
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(x, y, boxW, boxH, 8);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillRect(x, y, boxW, boxH);
+      ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+      ctx.strokeRect(x, y, boxW, boxH);
+    }
+    ctx.fillStyle = '#111827';
+    ctx.fillText(text, x + padX, y + boxH / 2);
+    ctx.restore();
+  }
+
+  function drawCurrentFrameToCanvas(imgEl, width, height, overlayTitle = '') {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    const tile = 28;
+    for (let y = 0; y < height; y += tile) {
+      for (let x = 0; x < width; x += tile) {
+        const even = ((x / tile) + (y / tile)) % 2 === 0;
+        ctx.fillStyle = even ? '#111419' : '#171a1f';
+        ctx.fillRect(x, y, tile, tile);
+      }
+    }
+
+    const source = imgEl;
+    const viewW = Math.max(1, viewer.clientWidth);
+    const viewH = Math.max(1, viewer.clientHeight);
+    const sx = width / viewW;
+    const sy = height / viewH;
+    const w = source.naturalWidth * scale * sx;
+    const h = source.naturalHeight * scale * sy;
+    ctx.drawImage(source, offsetX * sx, offsetY * sy, w, h);
+    drawOverlayTitle(ctx, width, overlayTitle);
+    return ctx.getImageData(0, 0, width, height);
+  }
+
+  function buildAdaptivePalette(imageData, maxColors = 256) {
+    // Median-cut palette, sampled for speed.
+    const data = imageData.data;
+    const pixels = [];
+    const totalPixels = imageData.width * imageData.height;
+    const step = Math.max(1, Math.floor(totalPixels / 250000));
+
+    for (let p = 0; p < totalPixels; p += step) {
+      const i = p * 4;
+      const a = data[i + 3];
+      let r = data[i];
+      let g = data[i + 1];
+      let b = data[i + 2];
+
+      if (a < 255) {
+        const bg = 17;
+        r = Math.round((r * a + bg * (255 - a)) / 255);
+        g = Math.round((g * a + bg * (255 - a)) / 255);
+        b = Math.round((b * a + bg * (255 - a)) / 255);
+      }
+      pixels.push([r, g, b]);
+    }
+
+    function bounds(box) {
+      let r0 = 255, r1 = 0, g0 = 255, g1 = 0, b0 = 255, b1 = 0;
+      for (const px of box) {
+        const [r,g,b] = px;
+        if (r < r0) r0 = r; if (r > r1) r1 = r;
+        if (g < g0) g0 = g; if (g > g1) g1 = g;
+        if (b < b0) b0 = b; if (b > b1) b1 = b;
+      }
+      return { rRange:r1-r0, gRange:g1-g0, bRange:b1-b0 };
+    }
+
+    let boxes = [pixels];
+
+    while (boxes.length < maxColors) {
+      let splitIndex = -1;
+      let splitScore = -1;
+      let channel = 0;
+
+      for (let i = 0; i < boxes.length; i++) {
+        const box = boxes[i];
+        if (box.length < 2) continue;
+        const b = bounds(box);
+        const range = Math.max(b.rRange, b.gRange, b.bRange);
+        const score = range * box.length;
+        if (score > splitScore) {
+          splitScore = score;
+          splitIndex = i;
+          channel = b.rRange >= b.gRange && b.rRange >= b.bRange ? 0 :
+                    (b.gRange >= b.bRange ? 1 : 2);
+        }
+      }
+
+      if (splitIndex < 0) break;
+
+      const box = boxes.splice(splitIndex, 1)[0];
+      box.sort((a,b) => a[channel] - b[channel]);
+      const mid = Math.floor(box.length / 2);
+      boxes.push(box.slice(0, mid), box.slice(mid));
+    }
+
+    const palette = new Uint8Array(256 * 3);
+    const actualColors = [];
+
+    for (const box of boxes.slice(0, 256)) {
+      let rs = 0, gs = 0, bs = 0;
+      for (const [r,g,b] of box) {
+        rs += r; gs += g; bs += b;
+      }
+      const n = Math.max(1, box.length);
+      actualColors.push([
+        Math.round(rs / n),
+        Math.round(gs / n),
+        Math.round(bs / n)
+      ]);
+    }
+
+    while (actualColors.length < 256) actualColors.push([0,0,0]);
+
+    for (let i = 0; i < 256; i++) {
+      palette[i*3] = actualColors[i][0];
+      palette[i*3+1] = actualColors[i][1];
+      palette[i*3+2] = actualColors[i][2];
+    }
+
+    return { palette, colors: actualColors };
+  }
+
+  function imageDataToIndexedAdaptive(imageData, colors) {
+    const width = imageData.width;
+    const height = imageData.height;
+    const src = imageData.data;
+    const out = new Uint8Array(width * height);
+
+    // Work in float RGB so we can diffuse quantization error.
+    const work = new Float32Array(width * height * 3);
+
+    for (let p = 0, j = 0; p < width * height; p++, j += 4) {
+      const a = src[j + 3] / 255;
+      const bg = 17;
+      work[p * 3]     = src[j]     * a + bg * (1 - a);
+      work[p * 3 + 1] = src[j + 1] * a + bg * (1 - a);
+      work[p * 3 + 2] = src[j + 2] * a + bg * (1 - a);
+    }
+
+    const cache = new Int16Array(32768);
+    cache.fill(-1);
+
+    function nearestIndex(r, g, b) {
+      r = Math.max(0, Math.min(255, r));
+      g = Math.max(0, Math.min(255, g));
+      b = Math.max(0, Math.min(255, b));
+
+      const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+      const cached = cache[key];
+      if (cached >= 0) return cached;
+
+      let best = 0;
+      let bestD = Infinity;
+
+      for (let i = 0; i < colors.length; i++) {
+        const c = colors[i];
+        const dr = r - c[0];
+        const dg = g - c[1];
+        const db = b - c[2];
+        // Perceptual-ish weighting.
+        const d = dr * dr * 2 + dg * dg * 4 + db * db;
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+          if (d === 0) break;
+        }
+      }
+
+      cache[key] = best;
+      return best;
+    }
+
+    function addError(x, y, er, eg, eb, weight) {
+      if (x < 0 || x >= width || y < 0 || y >= height) return;
+      const i = (y * width + x) * 3;
+      work[i]     += er * weight;
+      work[i + 1] += eg * weight;
+      work[i + 2] += eb * weight;
+    }
+
+    // Floyd-Steinberg with serpentine scanning to reduce directional artifacts.
+    for (let y = 0; y < height; y++) {
+      const reverse = (y & 1) === 1;
+      const xStart = reverse ? width - 1 : 0;
+      const xEnd = reverse ? -1 : width;
+      const step = reverse ? -1 : 1;
+
+      for (let x = xStart; x != xEnd; x += step) {
+        const p = y * width + x;
+        const i = p * 3;
+
+        const r = Math.max(0, Math.min(255, work[i]));
+        const g = Math.max(0, Math.min(255, work[i + 1]));
+        const b = Math.max(0, Math.min(255, work[i + 2]));
+
+        const idx = nearestIndex(r, g, b);
+        out[p] = idx;
+
+        const c = colors[idx];
+        const er = r - c[0];
+        const eg = g - c[1];
+        const eb = b - c[2];
+
+        if (!reverse) {
+          addError(x + 1, y,     er, eg, eb, 7 / 16);
+          addError(x - 1, y + 1, er, eg, eb, 3 / 16);
+          addError(x,     y + 1, er, eg, eb, 5 / 16);
+          addError(x + 1, y + 1, er, eg, eb, 1 / 16);
+        } else {
+          addError(x - 1, y,     er, eg, eb, 7 / 16);
+          addError(x + 1, y + 1, er, eg, eb, 3 / 16);
+          addError(x,     y + 1, er, eg, eb, 5 / 16);
+          addError(x - 1, y + 1, er, eg, eb, 1 / 16);
+        }
+      }
+    }
+
+    return out;
+  }
+
+  function writeWord(bytes, value) {
+    bytes.push(value & 255, (value >> 8) & 255);
+  }
+
+  function pushSubBlocks(bytes, dataBytes) {
+    let i = 0;
+    while (i < dataBytes.length) {
+      const n = Math.min(255, dataBytes.length - i);
+      bytes.push(n);
+      for (let j = 0; j < n; j++) bytes.push(dataBytes[i + j]);
+      i += n;
+    }
+    bytes.push(0);
+  }
+
+  function lzwEncode(indices, minCodeSize) {
+    // Conservative GIF-LZW encoder.
+    //
+    // Instead of growing the dictionary/code width all the way to 12 bits,
+    // periodically emit CLEAR and encode literal palette indexes. This is
+    // larger than an optimized GIF but extremely robust and keeps every code
+    // at a fixed 9-bit width for an 8-bit palette, avoiding decoder rollover
+    // bugs that can corrupt/garble frames.
+    const CLEAR = 1 << minCodeSize;   // 256
+    const EOI = CLEAR + 1;            // 257
+    const codeSize = minCodeSize + 1; // 9 bits
+
+    const out = [];
+    let bitBuffer = 0;
+    let bitCount = 0;
+
+    function emit(code) {
+      bitBuffer |= (code << bitCount);
+      bitCount += codeSize;
+
+      while (bitCount >= 8) {
+        out.push(bitBuffer & 0xFF);
+        bitBuffer >>>= 8;
+        bitCount -= 8;
+      }
+    }
+
+    // A GIF decoder begins adding dictionary entries after the second decoded
+    // literal. Reset well before 512 entries so code width never needs to grow.
+    const literalsPerChunk = 200;
+
+    let i = 0;
+    while (i < indices.length) {
+      emit(CLEAR);
+
+      const end = Math.min(indices.length, i + literalsPerChunk);
+      for (; i < end; i++) {
+        emit(indices[i]);
+      }
+    }
+
+    emit(EOI);
+
+    if (bitCount > 0) {
+      out.push(bitBuffer & 0xFF);
+    }
+
+    return out;
+  }
+
+  function buildGif(frameImageDatas, delayCs) {
+    const width = frameImageDatas[0].width;
+    const height = frameImageDatas[0].height;
+
+    const bytes = [];
+
+    // GIF89a header
+    bytes.push(71, 73, 70, 56, 57, 97);
+    writeWord(bytes, width);
+    writeWord(bytes, height);
+
+    // No global color table. Each frame gets its own adaptive 256-color table.
+    bytes.push(0x70);
+    bytes.push(0);
+    bytes.push(0);
+
+    // Netscape infinite-loop extension.
+    bytes.push(
+      0x21, 0xFF, 0x0B,
+      0x4E, 0x45, 0x54, 0x53, 0x43, 0x41, 0x50, 0x45, 0x32, 0x2E, 0x30,
+      0x03, 0x01, 0x00, 0x00, 0x00
+    );
+
+    for (const imageData of frameImageDatas) {
+      const { palette, colors } = buildAdaptivePalette(imageData, 256);
+      const indexed = imageDataToIndexedAdaptive(imageData, colors);
+      const lzwMin = 8;
+      const compressed = lzwEncode(indexed, lzwMin);
+
+      // Graphic Control Extension.
+      bytes.push(0x21, 0xF9, 0x04, 0x00);
+      writeWord(bytes, delayCs);
+      bytes.push(0x00, 0x00);
+
+      // Image Descriptor with local 256-color table.
+      bytes.push(0x2C);
+      writeWord(bytes, 0);
+      writeWord(bytes, 0);
+      writeWord(bytes, width);
+      writeWord(bytes, height);
+      bytes.push(0x87); // local color table present, 256 entries
+
+      for (let i = 0; i < palette.length; i++) bytes.push(palette[i]);
+
+      bytes.push(lzwMin);
+      pushSubBlocks(bytes, compressed);
+    }
+
+    bytes.push(0x3B);
+    return new Uint8Array(bytes);
+  }
+
+  function loadImageFromUrl(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+
+  function u32be(n) {
+    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+  }
+
+  function u32le(n) {
+    return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  }
+
+  function crc32(bytes) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) {
+      crc ^= bytes[i];
+      for (let k = 0; k < 8; k++) {
+        crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+      }
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function adler32(bytes) {
+    let a = 1, b = 0;
+    const MOD = 65521;
+    for (let i = 0; i < bytes.length; i++) {
+      a = (a + bytes[i]) % MOD;
+      b = (b + a) % MOD;
+    }
+    return ((b << 16) | a) >>> 0;
+  }
+
+  function concatUint8(parts) {
+    const len = parts.reduce((n,p) => n + p.length, 0);
+    const out = new Uint8Array(len);
+    let off = 0;
+    for (const p of parts) {
+      out.set(p, off);
+      off += p.length;
+    }
+    return out;
+  }
+
+  function pngChunk(type, data) {
+    const typeBytes = new TextEncoder().encode(type);
+    const crcInput = concatUint8([typeBytes, data]);
+    return concatUint8([
+      new Uint8Array(u32be(data.length)),
+      typeBytes,
+      data,
+      new Uint8Array(u32be(crc32(crcInput)))
+    ]);
+  }
+
+  function zlibStore(raw) {
+    // Valid zlib stream using uncompressed DEFLATE blocks.
+    const parts = [new Uint8Array([0x78, 0x01])];
+    let off = 0;
+
+    while (off < raw.length) {
+      const len = Math.min(65535, raw.length - off);
+      const final = (off + len >= raw.length) ? 1 : 0;
+      const nlen = (~len) & 0xFFFF;
+
+      const hdr = new Uint8Array([
+        final,
+        len & 255, (len >>> 8) & 255,
+        nlen & 255, (nlen >>> 8) & 255
+      ]);
+
+      parts.push(hdr, raw.subarray(off, off + len));
+      off += len;
+    }
+
+    parts.push(new Uint8Array(u32be(adler32(raw))));
+    return concatUint8(parts);
+  }
+
+  function imageDataToPngScanlines(imageData) {
+    const {width, height, data} = imageData;
+    const stride = width * 4;
+    const out = new Uint8Array((stride + 1) * height);
+
+    for (let y = 0; y < height; y++) {
+      const dstRow = y * (stride + 1);
+      out[dstRow] = 0; // PNG filter: None
+      out.set(data.subarray(y * stride, (y + 1) * stride), dstRow + 1);
+    }
+    return out;
+  }
+
+  function buildAPNG(frameImageDatas, delayMs) {
+    const width = frameImageDatas[0].width;
+    const height = frameImageDatas[0].height;
+    const pngSig = new Uint8Array([137,80,78,71,13,10,26,10]);
+
+    const ihdr = new Uint8Array(13);
+    ihdr.set(u32be(width), 0);
+    ihdr.set(u32be(height), 4);
+    ihdr[8] = 8;  // bit depth
+    ihdr[9] = 6;  // RGBA
+    ihdr[10] = 0;
+    ihdr[11] = 0;
+    ihdr[12] = 0;
+
+    const parts = [pngSig, pngChunk('IHDR', ihdr)];
+
+    const actl = new Uint8Array(8);
+    actl.set(u32be(frameImageDatas.length), 0);
+    actl.set(u32be(0), 4); // infinite loop
+    parts.push(pngChunk('acTL', actl));
+
+    let seq = 0;
+    const delayNum = Math.max(1, Math.round(delayMs));
+    const delayDen = 1000;
+
+    frameImageDatas.forEach((frame, idx) => {
+      const fctl = new Uint8Array(26);
+      fctl.set(u32be(seq++), 0);
+      fctl.set(u32be(width), 4);
+      fctl.set(u32be(height), 8);
+      fctl.set(u32be(0), 12); // x
+      fctl.set(u32be(0), 16); // y
+      fctl[20] = (delayNum >>> 8) & 255;
+      fctl[21] = delayNum & 255;
+      fctl[22] = (delayDen >>> 8) & 255;
+      fctl[23] = delayDen & 255;
+      fctl[24] = 0; // dispose none
+      fctl[25] = 0; // blend source
+      parts.push(pngChunk('fcTL', fctl));
+
+      const compressed = zlibStore(imageDataToPngScanlines(frame));
+
+      if (idx === 0) {
+        parts.push(pngChunk('IDAT', compressed));
+      } else {
+        const fdat = new Uint8Array(4 + compressed.length);
+        fdat.set(u32be(seq++), 0);
+        fdat.set(compressed, 4);
+        parts.push(pngChunk('fdAT', fdat));
+      }
+    });
+
+    parts.push(pngChunk('IEND', new Uint8Array(0)));
+    return new Blob(parts, {type:'image/apng'});
+  }
+
+  async function imageDataToWebPBlob(imageData, quality = 0.98) {
+    const canvas = document.createElement('canvas');
+    canvas.width = imageData.width;
+    canvas.height = imageData.height;
+    canvas.getContext('2d').putImageData(imageData, 0, 0);
+
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error('WebP encoding unavailable in this browser.'));
+      }, 'image/webp', quality);
+    });
+  }
+
+  function riffChunk(fourCC, payload) {
+    const pad = payload.length & 1;
+    const header = new Uint8Array(8);
+    header.set(new TextEncoder().encode(fourCC), 0);
+    header.set(u32le(payload.length), 4);
+    return concatUint8([header, payload, pad ? new Uint8Array([0]) : new Uint8Array(0)]);
+  }
+
+  async function buildAnimatedWebP(frameImageDatas, delayMs) {
+    // Encode each frame as WebP, then repack its VP8/VP8L payload into an animated WebP.
+    const encoded = [];
+    for (const frame of frameImageDatas) {
+      encoded.push(new Uint8Array(await (await imageDataToWebPBlob(frame, 0.98)).arrayBuffer()));
+    }
+
+    function parseWebPChunks(bytes) {
+      const chunks = [];
+      let off = 12; // RIFF....WEBP
+      while (off + 8 <= bytes.length) {
+        const cc = String.fromCharCode(bytes[off],bytes[off+1],bytes[off+2],bytes[off+3]);
+        const len = bytes[off+4] | (bytes[off+5]<<8) | (bytes[off+6]<<16) | (bytes[off+7]<<24);
+        const data = bytes.slice(off + 8, off + 8 + len);
+        chunks.push({cc, data});
+        off += 8 + len + (len & 1);
+      }
+      return chunks;
+    }
+
+    const width = frameImageDatas[0].width;
+    const height = frameImageDatas[0].height;
+
+    const vp8x = new Uint8Array(10);
+    vp8x[0] = 0x02; // animation flag
+    const w1 = width - 1, h1 = height - 1;
+    vp8x[4] = w1 & 255; vp8x[5] = (w1>>>8)&255; vp8x[6] = (w1>>>16)&255;
+    vp8x[7] = h1 & 255; vp8x[8] = (h1>>>8)&255; vp8x[9] = (h1>>>16)&255;
+
+    const anim = new Uint8Array(6);
+    anim[0]=0; anim[1]=0; anim[2]=0; anim[3]=0; // bg color
+    anim[4]=0; anim[5]=0; // infinite loop
+
+    const chunks = [riffChunk('VP8X', vp8x), riffChunk('ANIM', anim)];
+
+    for (const frameBytes of encoded) {
+      const parsed = parseWebPChunks(frameBytes);
+      const imgChunks = parsed.filter(c => c.cc === 'VP8 ' || c.cc === 'VP8L' || c.cc === 'ALPH');
+      if (!imgChunks.length) throw new Error('Could not parse WebP frame.');
+
+      const frameHeader = new Uint8Array(16);
+      // x/y = 0
+      const wm1 = width - 1, hm1 = height - 1;
+      frameHeader[6] = wm1 & 255; frameHeader[7] = (wm1>>>8)&255; frameHeader[8] = (wm1>>>16)&255;
+      frameHeader[9] = hm1 & 255; frameHeader[10] = (hm1>>>8)&255; frameHeader[11] = (hm1>>>16)&255;
+      const d = Math.max(1, Math.round(delayMs));
+      frameHeader[12] = d & 255; frameHeader[13] = (d>>>8)&255; frameHeader[14] = (d>>>16)&255;
+      frameHeader[15] = 0; // blend+dispose defaults
+
+      const payloadParts = [frameHeader];
+      for (const c of imgChunks) payloadParts.push(riffChunk(c.cc, c.data));
+      chunks.push(riffChunk('ANMF', concatUint8(payloadParts)));
+    }
+
+    const body = concatUint8([new TextEncoder().encode('WEBP'), ...chunks]);
+    const riff = concatUint8([
+      new TextEncoder().encode('RIFF'),
+      new Uint8Array(u32le(body.length)),
+      body
+    ]);
+
+    return new Blob([riff], {type:'image/webp'});
+  }
+
+  async function exportCurrentAnimation() {
+    if (mode !== 'blink') {
+      alert('Switch to Blink mode before exporting.');
+      return;
+    }
+
+    exportAnimBtn.disabled = true;
+    exportFormat.disabled = true;
+    exportAnimBtn.textContent = 'Exporting...';
+
+    try {
+      const viewW = Math.max(1, Math.round(viewer.clientWidth));
+      const viewH = Math.max(1, Math.round(viewer.clientHeight));
+      const maxDim = 2048;
+      const outScale = Math.min(1, maxDim / Math.max(viewW, viewH));
+      const width = Math.max(1, Math.round(viewW * outScale));
+      const height = Math.max(1, Math.round(viewH * outScale));
+
+      const a = selectedSlot(selectA);
+      const b = selectedSlot(selectB);
+      if (!a || !b) throw new Error('Two selected images are required.');
+
+      const aTitle = a.name || 'image1';
+      const bTitle = b.name || 'image2';
+
+      const [exportImgA, exportImgB] = await Promise.all([
+        loadImageFromUrl(a.url),
+        loadImageFromUrl(b.url)
+      ]);
+
+      const aFrame = drawCurrentFrameToCanvas(exportImgA, width, height, aTitle);
+      const bFrame = drawCurrentFrameToCanvas(exportImgB, width, height, bTitle);
+
+      const hz = Math.max(0.2, Number(blinkRateInput.value) || 2);
+      const delayMs = 1000 / hz;
+      const baseNameA = aTitle.replace(/\.[^.]+$/, '');
+      const baseNameB = bTitle.replace(/\.[^.]+$/, '');
+      const stem = `${baseNameA}_vs_${baseNameB}_${hz}hz`;
+
+      const fmt = exportFormat.value;
+
+      if (fmt === 'gif') {
+        const delayCs = Math.max(2, Math.round(100 / hz));
+        const gifBytes = buildGif([aFrame, bFrame], delayCs);
+        downloadBlob(new Blob([gifBytes], {type:'image/gif'}), `${stem}.gif`);
+      } else if (fmt === 'apng') {
+        const blob = buildAPNG([aFrame, bFrame], delayMs);
+        downloadBlob(blob, `${stem}.png`);
+      } else if (fmt === 'webp') {
+        const blob = await buildAnimatedWebP([aFrame, bFrame], delayMs);
+        downloadBlob(blob, `${stem}.webp`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export animation: ' + (err && err.message ? err.message : err));
+    } finally {
+      exportAnimBtn.disabled = false;
+      exportFormat.disabled = false;
+      exportAnimBtn.textContent = 'Export';
+    }
+  }
+
+  // Upload screen events
+  bulkDrop.addEventListener('click', () => bulkDropInput.click());
+  bulkDropInput.addEventListener('change', () => {
+    if (bulkDropInput.files) addFiles(bulkDropInput.files);
+    bulkDropInput.value = '';
+  });
+  bulkDrop.addEventListener('dragover', e => {
+    e.preventDefault();
+    bulkDrop.classList.add('dragover');
+  });
+  bulkDrop.addEventListener('dragleave', () => bulkDrop.classList.remove('dragover'));
+  bulkDrop.addEventListener('drop', e => {
+    e.preventDefault();
+    bulkDrop.classList.remove('dragover');
+    addFiles(e.dataTransfer.files);
+  });
+
+  addSlotBtn.addEventListener('click', () => {
+    addEmptySlot();
+    renderSlots();
+  });
+
+  clearAllBtn.addEventListener('click', () => {
+    slots.forEach(releaseSlot);
+    slots = [];
+    ensureMinimumSlots(2);
+    renderSlots();
+    updateCount();
+  });
+
+  compareBtn.addEventListener('click', () => {
+    if (loadedImages().length < 2) return;
+    populateSelectors();
+    uploadScreen.classList.add('hidden');
+    compareScreen.classList.remove('hidden');
+    setMode('slider');
+    updateSelectedImages(true);
+  });
+
+  // Compare controls
+  backBtn.addEventListener('click', () => {
+    stopBlink();
+    compareScreen.classList.add('hidden');
+    uploadScreen.classList.remove('hidden');
+  });
+
+  selectA.addEventListener('change', () => updateSelectedImages(false));
+  selectB.addEventListener('change', () => updateSelectedImages(false));
+
+  swapBtn.addEventListener('click', () => {
+    const a = selectA.value;
+    selectA.value = selectB.value;
+    selectB.value = a;
+    updateSelectedImages(false);
+  });
+
+  sliderModeBtn.addEventListener('click', () => setMode('slider'));
+  sideModeBtn.addEventListener('click', () => setMode('side'));
+  blinkModeBtn.addEventListener('click', () => setMode('blink'));
+
+  blinkRateInput.addEventListener('change', restartBlink);
+  blinkRateInput.addEventListener('input', restartBlink);
+
+  pauseBlinkBtn.addEventListener('click', () => {
+    blinkPaused = !blinkPaused;
+    pauseBlinkBtn.textContent = blinkPaused ? 'Resume' : 'Pause';
+    if (blinkPaused) stopBlink();
+    else restartBlink();
+  });
+
+  zoomInBtn.addEventListener('click', () => zoomAt(1.25));
+  zoomOutBtn.addEventListener('click', () => zoomAt(1 / 1.25));
+  resetBtn.addEventListener('click', fitToScreen);
+
+  viewer.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = viewer.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+
+  splitHitbox.addEventListener('pointerdown', e => {
+    if (mode !== 'slider') return;
+    draggingSplit = true;
+    splitHitbox.setPointerCapture(e.pointerId);
+    setSplitFromClientX(e.clientX);
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  splitHitbox.addEventListener('pointermove', e => {
+    if (!draggingSplit) return;
+    setSplitFromClientX(e.clientX);
+  });
+
+  splitHitbox.addEventListener('pointerup', e => {
+    draggingSplit = false;
+    try { splitHitbox.releasePointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  viewer.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || draggingSplit) return;
+    draggingPan = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    viewer.classList.add('dragging');
+    viewer.setPointerCapture(e.pointerId);
+  });
+
+  viewer.addEventListener('pointermove', e => {
+    if (!draggingPan) return;
+    offsetX += e.clientX - lastX;
+    offsetY += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    applyTransform();
+  });
+
+  viewer.addEventListener('pointerup', e => {
+    draggingPan = false;
+    viewer.classList.remove('dragging');
+    try { viewer.releasePointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  viewer.addEventListener('dblclick', e => {
+    const r = viewer.getBoundingClientRect();
+    zoomAt((scale / fitScale) > 1.05 ? (fitScale / scale) : 2, e.clientX - r.left, e.clientY - r.top);
+  });
+
+  fullscreenBtn.addEventListener('click', async () => {
+    try {
+      if (!document.fullscreenElement) await compareScreen.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch (_) {}
+  });
+
+  exportAnimBtn.addEventListener('click', exportCurrentAnimation);
+
+  window.addEventListener('keydown', e => {
+    if (compareScreen.classList.contains('hidden')) return;
+
+    if (e.key === '+' || e.key === '=') zoomAt(1.25);
+    if (e.key === '-') zoomAt(1 / 1.25);
+    if (e.key.toLowerCase() === 'r') fitToScreen();
+    if (e.key.toLowerCase() === 'x' && !swapBtn.disabled) swapBtn.click();
+    if (e.key.toLowerCase() === 'b') setMode('blink');
+    if (e.key.toLowerCase() === 's') setMode('slider');
+
+    if (/^[1-9]$/.test(e.key) && mode !== 'side') {
+      const imgs = loadedImages();
+      const idx = Number(e.key) - 1;
+      if (idx < imgs.length) {
+        if (e.shiftKey) selectB.value = String(imgs[idx].id);
+        else selectA.value = String(imgs[idx].id);
+        updateSelectedImages(false);
+      }
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    setSplitFromClientX(viewer.getBoundingClientRect().left + viewer.clientWidth * split);
+  });
+
+  // Init
+  ensureMinimumSlots(2);
+  renderSlots();
+  updateCount();
+})();
+</script>
+</body>
+</html>
